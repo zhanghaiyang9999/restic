@@ -95,7 +95,7 @@ func rootDirectory(fs fs.FS, target string) string {
 }
 
 // Add adds a new file or directory to the tree.
-func (t *tree) Add(fs fs.FS, path string) error {
+func (t *tree) Add(fs fs.FS, path string, keepRootPath bool) error {
 	if path == "" {
 		panic("invalid path (empty string)")
 	}
@@ -104,7 +104,16 @@ func (t *tree) Add(fs fs.FS, path string) error {
 		t.Nodes = make(map[string]tree)
 	}
 
-	pc, virtualPrefix := pathComponents(fs, path, false)
+	var pc []string
+	virtualPrefix := false
+	if keepRootPath {
+		pc, virtualPrefix = pathComponents(fs, path, false)
+	} else {
+		virtualPrefix = true
+		root_path := fs.Base(path)
+		pc = append(pc, root_path)
+	}
+
 	if len(pc) == 0 {
 		return errors.New("invalid path (no path components)")
 	}
@@ -270,7 +279,7 @@ func unrollTree(f fs.FS, t *tree) error {
 }
 
 // newTree creates a Tree from the target files/directories.
-func newTree(fs fs.FS, targets []string) (*tree, error) {
+func newTree(fs fs.FS, targets []string, keepRootPath bool) (*tree, error) {
 	debug.Log("targets: %v", targets)
 	tree := &tree{}
 	seen := make(map[string]struct{})
@@ -283,7 +292,7 @@ func newTree(fs fs.FS, targets []string) (*tree, error) {
 		}
 		seen[target] = struct{}{}
 
-		err := tree.Add(fs, target)
+		err := tree.Add(fs, target, keepRootPath)
 		if err != nil {
 			return nil, err
 		}

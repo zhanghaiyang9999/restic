@@ -112,7 +112,7 @@ func TestScanner(t *testing.T) {
 				results[p] = s
 			}
 
-			err = sc.Scan(ctx, []string{"."})
+			err = sc.Scan(ctx, []string{"."}, true)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -263,7 +263,7 @@ func TestScannerError(t *testing.T) {
 				}
 			}
 
-			err = sc.Scan(ctx, []string{"."})
+			err = sc.Scan(ctx, []string{"."}, true)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -310,7 +310,7 @@ func TestScannerCancel(t *testing.T) {
 		}
 	}
 
-	err = sc.Scan(ctx, []string{"."})
+	err = sc.Scan(ctx, []string{"."}, true)
 	if err != nil {
 		t.Errorf("unexpected error %v found", err)
 	}

@@ -70,7 +70,7 @@ func (s *Scanner) scanTree(ctx context.Context, stats ScanStats, tree tree) (Sca
 
 // Scan traverses the targets. The function Result is called for each new item
 // found, the complete result is also returned by Scan.
-func (s *Scanner) Scan(ctx context.Context, targets []string) error {
+func (s *Scanner) Scan(ctx context.Context, targets []string, KeepRootPath bool) error {
 	debug.Log("start scan for %v", targets)
 
 	cleanTargets, err := resolveRelativeTargets(s.FS, targets)
@@ -81,7 +81,7 @@ func (s *Scanner) Scan(ctx context.Context, targets []string) error {
 	debug.Log("clean targets %v", cleanTargets)
 
 	// we're using the same tree representation as the archiver does
-	tree, err := newTree(s.FS, cleanTargets)
+	tree, err := newTree(s.FS, cleanTargets, KeepRootPath)
 	if err != nil {
 		return err
 	}

@@ -798,6 +798,10 @@ type SnapshotOptions struct {
 	ProgramVersion string
 	// SkipIfUnchanged omits the snapshot creation if it is identical to the parent snapshot.
 	SkipIfUnchanged bool
+	// If KeepRootPath is true, the full path will be kept in the tree. when restoring, will keep the full path too.
+	// For example, /home/user/dirs will be kept as /home/user/dirs instead of just dirs.
+	// The default is true
+	KeepRootPath bool
 }
 
 // loadParentTree loads a tree referenced by snapshot id. If id is null, nil is returned.
@@ -855,7 +859,7 @@ func (arch *Archiver) Snapshot(ctx context.Context, targets []string, opts Snaps
 		return nil, restic.ID{}, nil, err
 	}
 
-	atree, err := newTree(arch.FS, cleanTargets)
+	atree, err := newTree(arch.FS, cleanTargets, opts.KeepRootPath)
 	if err != nil {
 		return nil, restic.ID{}, nil, err
 	}

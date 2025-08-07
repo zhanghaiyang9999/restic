@@ -103,6 +103,7 @@ type BackupOptions struct {
 	ReadConcurrency   uint
 	NoScan            bool
 	SkipIfUnchanged   bool
+	KeepRootPath      bool
 }
 
 func (opts *BackupOptions) AddFlags(f *pflag.FlagSet) {
@@ -143,7 +144,7 @@ func (opts *BackupOptions) AddFlags(f *pflag.FlagSet) {
 		f.BoolVar(&opts.ExcludeCloudFiles, "exclude-cloud-files", false, "excludes online-only cloud files (such as OneDrive Files On-Demand)")
 	}
 	f.BoolVar(&opts.SkipIfUnchanged, "skip-if-unchanged", false, "skip snapshot creation if identical to parent snapshot")
-
+	f.BoolVar(&opts.KeepRootPath, "keep-root-path", true, "keep the full backup path")
 	// parse read concurrency from env, on error the default value will be used
 	readConcurrency, _ := strconv.ParseUint(os.Getenv("RESTIC_READ_CONCURRENCY"), 10, 32)
 	opts.ReadConcurrency = uint(readConcurrency)
@@ -628,7 +629,7 @@ func runBackup(ctx context.Context, opts BackupOptions, gopts GlobalOptions, ter
 		if !gopts.JSON {
 			progressPrinter.V("start scan on %v", targets)
 		}
-		wg.Go(func() error { return sc.Scan(cancelCtx, targets) })
+		wg.Go(func() error { return sc.Scan(cancelCtx, targets, opts.KeepRootPath) })
 	}
 
 	arch := archiver.New(repo, targetFS, archiver.Options{ReadConcurrency: opts.ReadConcurrency})
@@ -668,6 +669,7 @@ func runBackup(ctx context.Context, opts BackupOptions, gopts GlobalOptions, ter
 		ParentSnapshot:  parentSnapshot,
 		ProgramVersion:  "restic " + version,
 		SkipIfUnchanged: opts.SkipIfUnchanged,
+		KeepRootPath:    opts.KeepRootPath,
 	}
 
 	if !gopts.JSON {

@@ -1110,7 +1110,7 @@ func TestArchiverSaveTree(t *testing.T) {
 				test.prepare(t)
 			}
 
-			atree, err := newTree(testFS, test.targets)
+			atree, err := newTree(testFS, test.targets, true)
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -913,7 +913,7 @@ func TestRestorerSparseFiles(t *testing.T) {
 	})
 	rtest.OK(t, err)
 	sc := archiver.NewScanner(target)
-	err = sc.Scan(context.TODO(), []string{"/zeros"})
+	err = sc.Scan(context.TODO(), []string{"/zeros"}, true)
 	rtest.OK(t, err)
 
 	arch := archiver.New(repo, target, archiver.Options{})
@@ -1548,7 +1548,7 @@ func TestRestorerLongPath(t *testing.T) {
 
 	local := &fs.Local{}
 	sc := archiver.NewScanner(local)
-	rtest.OK(t, sc.Scan(context.TODO(), []string{tmp}))
+	rtest.OK(t, sc.Scan(context.TODO(), []string{tmp}, true))
 	arch := archiver.New(repo, local, archiver.Options{})
 	sn, _, _, err := arch.Snapshot(context.Background(), []string{tmp}, archiver.SnapshotOptions{})
 	rtest.OK(t, err)
