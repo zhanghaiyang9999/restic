@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 
 	"github.com/restic/restic/internal/debug"
@@ -39,11 +40,12 @@ type Restorer struct {
 var restorerAbortOnAllErrors = func(_ string, err error) error { return err }
 
 type Options struct {
-	DryRun    bool
-	Sparse    bool
-	Progress  *restoreui.Progress
-	Overwrite OverwriteBehavior
-	Delete    bool
+	DryRun      bool
+	Sparse      bool
+	Progress    *restoreui.Progress
+	Overwrite   OverwriteBehavior
+	Delete      bool
+	IncludePath string
 }
 
 type OverwriteBehavior int
@@ -189,7 +191,6 @@ func (res *Restorer) traverseTreeInner(ctx context.Context, target, location str
 			res.opts.Delete = false
 			continue
 		}
-
 		nodeTarget := filepath.Join(target, nodeName)
 		nodeLocation := filepath.Join(location, nodeName)
 
@@ -336,6 +337,41 @@ func (res *Restorer) ensureDir(target string) error {
 	return fs.MkdirAll(target, 0700)
 }
 
+/*
+Skip the parents of the parents path
+*/
+func (res *Restorer) findSubtreeByPath(ctx context.Context, repo restic.Repository, treeID restic.ID, pathComponents []string) (*restic.ID, error) {
+
+	tree, err := restic.LoadTree(ctx, repo, treeID)
+	if err != nil {
+		return &treeID, nil
+	}
+	currentComponent := pathComponents[0]
+	for _, node := range tree.Nodes {
+		if strings.EqualFold(node.Name, currentComponent) {
+			if len(pathComponents) == 1 {
+				if node.Subtree == nil {
+					return nil, fmt.Errorf("node %s is not a directory", currentComponent)
+				}
+				return &treeID, nil
+			}
+
+			if node.Type != restic.NodeTypeDir {
+				return nil, fmt.Errorf("node %s is not a directory", currentComponent)
+			}
+
+			if node.Subtree == nil {
+				return nil, fmt.Errorf("directory node %s has no subtree", currentComponent)
+			}
+
+			remainingPath := (pathComponents[1:])
+			return res.findSubtreeByPath(ctx, repo, *node.Subtree, remainingPath)
+		}
+	}
+
+	return nil, fmt.Errorf("path component %s not found in tree", currentComponent)
+}
+
 // RestoreTo creates the directories and files in the snapshot below dst.
 // Before an item is created, res.Filter is called.
 func (res *Restorer) RestoreTo(ctx context.Context, dst string) (uint64, error) {
@@ -366,8 +402,16 @@ func (res *Restorer) RestoreTo(ctx context.Context, dst string) (uint64, error) 
 
 	var buf []byte
 
+	//tree, err := restic.LoadTree(ctx, res.repo, *res.sn.Tree)
+	treeId := res.sn.Tree
+	if res.opts.IncludePath != "" {
+		subTreeId, err := res.findSubtreeByPath(ctx, res.repo, *treeId, strings.Split(res.opts.IncludePath, "/"))
+		if err == nil && subTreeId != nil {
+			treeId = subTreeId
+		}
+	}
 	// first tree pass: create directories and collect all files to restore
-	err = res.traverseTree(ctx, dst, *res.sn.Tree, treeVisitor{
+	err = res.traverseTree(ctx, dst, *treeId, treeVisitor{
 		enterDir: func(_ *restic.Node, target, location string) error {
 			debug.Log("first pass, enterDir: mkdir %q, leaveDir should restore metadata", location)
 			if location != string(filepath.Separator) {
@@ -435,7 +479,7 @@ func (res *Restorer) RestoreTo(ctx context.Context, dst string) (uint64, error) 
 	debug.Log("second pass for %q", dst)
 
 	// second tree pass: restore special files and filesystem metadata
-	err = res.traverseTree(ctx, dst, *res.sn.Tree, treeVisitor{
+	err = res.traverseTree(ctx, dst, *treeId, treeVisitor{
 		visitNode: func(node *restic.Node, target, location string) error {
 			debug.Log("second pass, visitNode: restore node %q", location)
 			if node.Type != restic.NodeTypeFile {
