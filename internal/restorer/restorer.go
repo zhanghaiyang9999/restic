@@ -406,10 +406,6 @@ func (res *Restorer) RestoreTo(ctx context.Context, dst string) (uint64, error) 
 	treeId := res.sn.Tree
 	if res.opts.IncludePath != "" {
 		pathCom := strings.Split(res.opts.IncludePath, "/")
-		if res.opts.IncludePath[0] == '/' {
-			pathCom = pathCom[1:]
-			pathCom = append([]string{"/"}, pathCom...)
-		}
 		subNode, err = res.findSubNodeByPath(ctx, res.repo, *treeId, pathCom)
 		if err == nil && subNode != nil {
 			treeId = subNode.Subtree
