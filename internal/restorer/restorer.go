@@ -340,32 +340,32 @@ func (res *Restorer) ensureDir(target string) error {
 /*
 Skip the parents of the parents path
 */
-func (res *Restorer) findSubtreeByPath(ctx context.Context, repo restic.Repository, treeID restic.ID, pathComponents []string) (*restic.ID, error) {
+func (res *Restorer) findSubNodeByPath(ctx context.Context, repo restic.Repository, treeID restic.ID, pathComponents []string) (*restic.Node, error) {
 
 	tree, err := restic.LoadTree(ctx, repo, treeID)
 	if err != nil {
-		return &treeID, nil
+		return nil, nil
 	}
 	currentComponent := pathComponents[0]
 	for _, node := range tree.Nodes {
 		if strings.EqualFold(node.Name, currentComponent) {
 			if len(pathComponents) == 1 {
-				if node.Subtree == nil {
+				if node == nil {
 					return nil, fmt.Errorf("node %s is not a directory", currentComponent)
 				}
-				return &treeID, nil
+				return node, nil
 			}
 
 			if node.Type != restic.NodeTypeDir {
 				return nil, fmt.Errorf("node %s is not a directory", currentComponent)
 			}
 
-			if node.Subtree == nil {
+			if node == nil {
 				return nil, fmt.Errorf("directory node %s has no subtree", currentComponent)
 			}
 
 			remainingPath := (pathComponents[1:])
-			return res.findSubtreeByPath(ctx, repo, *node.Subtree, remainingPath)
+			return res.findSubNodeByPath(ctx, repo, *node.Subtree, remainingPath)
 		}
 	}
 
@@ -402,12 +402,16 @@ func (res *Restorer) RestoreTo(ctx context.Context, dst string) (uint64, error) 
 
 	var buf []byte
 
-	//tree, err := restic.LoadTree(ctx, res.repo, *res.sn.Tree)
+	var subNode *restic.Node
 	treeId := res.sn.Tree
 	if res.opts.IncludePath != "" {
-		subTreeId, err := res.findSubtreeByPath(ctx, res.repo, *treeId, strings.Split(res.opts.IncludePath, "/"))
-		if err == nil && subTreeId != nil {
-			treeId = subTreeId
+		pathCom := strings.Split(res.opts.IncludePath, "/")
+		if res.opts.IncludePath[0] == '/' {
+			pathCom = append([]string{"/"}, pathCom...)
+		}
+		subNode, err = res.findSubNodeByPath(ctx, res.repo, *treeId, pathCom)
+		if err == nil && subNode != nil {
+			treeId = subNode.Subtree
 		}
 	}
 	// first tree pass: create directories and collect all files to restore
@@ -520,6 +524,14 @@ func (res *Restorer) RestoreTo(ctx context.Context, dst string) (uint64, error) 
 			return err
 		},
 	})
+
+	/*
+		If use the include path(--include-path flag), we need to restore the node metadata for the target
+	*/
+	if res.opts.IncludePath != "" {
+		location := filepath.Join(string(filepath.Separator), subNode.Name)
+		res.restoreNodeMetadataTo(subNode, dst, location)
+	}
 	return restoredFileCount, err
 }
 
