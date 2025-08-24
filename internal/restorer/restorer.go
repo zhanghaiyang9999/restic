@@ -407,6 +407,7 @@ func (res *Restorer) RestoreTo(ctx context.Context, dst string) (uint64, error) 
 	if res.opts.IncludePath != "" {
 		pathCom := strings.Split(res.opts.IncludePath, "/")
 		if res.opts.IncludePath[0] == '/' {
+			pathCom = pathCom[1:]
 			pathCom = append([]string{"/"}, pathCom...)
 		}
 		subNode, err = res.findSubNodeByPath(ctx, res.repo, *treeId, pathCom)
@@ -528,7 +529,7 @@ func (res *Restorer) RestoreTo(ctx context.Context, dst string) (uint64, error) 
 	/*
 		If use the include path(--include-path flag), we need to restore the node metadata for the target
 	*/
-	if res.opts.IncludePath != "" {
+	if res.opts.IncludePath != "" && subNode != nil {
 		location := filepath.Join(string(filepath.Separator), subNode.Name)
 		res.restoreNodeMetadataTo(subNode, dst, location)
 	}
